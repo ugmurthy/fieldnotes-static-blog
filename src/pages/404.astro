@@ -1,0 +1,7 @@
+---
+import BlogLayout from '../layouts/BlogLayout.astro';
+import { href } from '../settings';
+---
+<BlogLayout title="Guide not found" description="This guide may have moved, or the link may be incorrect." noindex>
+  <header class="index-header"><p class="eyebrow">404 · A missing page</p><h1>Let’s find another way.</h1><p class="lead">This guide may have moved, or the link may be incorrect.</p><a class="button" href={href()}>Browse tutorials & tips <span aria-hidden="true">↗</span></a></header>
+</BlogLayout>

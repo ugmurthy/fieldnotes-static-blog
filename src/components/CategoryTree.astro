@@ -1,0 +1,18 @@
+---
+import type { Category } from '../catalog';
+import { href } from '../settings';
+interface Props { categories: Category[]; parent?: string; current?: string; }
+const { categories, parent = '', current = '' } = Astro.props;
+---
+<ul class="category-tree">
+  {categories.filter((category) => category.parent === parent).map((category) => (
+    <li>
+      {categories.some((child) => child.parent === category.id) ? (
+        <details open={current === category.id || current.startsWith(category.id + '/')}>
+          <summary><a href={href(`category/${category.id}/`)} aria-current={current === category.id ? 'page' : undefined}>{category.title}</a></summary>
+          <Astro.self categories={categories} parent={category.id} current={current} />
+        </details>
+      ) : <a href={href(`category/${category.id}/`)} aria-current={current === category.id ? 'page' : undefined}>{category.title}</a>}
+    </li>
+  ))}
+</ul>

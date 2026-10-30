@@ -1,0 +1,18 @@
+{
+  "name": "Your app",
+  "title": "Tutorials & tips",
+  "description": "Practical guides to getting more from your app.",
+  "site": "https://example.com",
+  "base": "/",
+  "contentDir": "./blogposts",
+  "outDir": "./dist",
+  "homeUrl": "https://example.com",
+  "appUrl": "https://example.com/app",
+  "signupUrl": "https://example.com/signup",
+  "ctaLabel": "Try the app",
+  "ctaDescription": "Put what you have learned into practice.",
+  "author": "The team",
+  "accent": "#3050d0",
+  "pageSize": 10,
+  "redirects": {}
+}

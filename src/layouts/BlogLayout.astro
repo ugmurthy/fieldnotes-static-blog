@@ -1,0 +1,83 @@
+---
+import CategoryTree from '../components/CategoryTree.astro';
+import { catalog, type Post } from '../catalog';
+import { settings, href, absolute } from '../settings';
+import '../styles.css';
+interface Props { title: string; description: string; current?: string; post?: Post; noindex?: boolean; }
+const { title, description, current = '', post, noindex = false } = Astro.props;
+const { categories } = await catalog();
+const canonical = absolute(Astro.url.pathname);
+const socialImage = settings.socialImage ? absolute(settings.socialImage) : undefined;
+const structuredData = post ? {
+  '@context': 'https://schema.org', '@type': 'BlogPosting', headline: post.data.title,
+  description, datePublished: post.data.published, dateModified: post.data.updated ?? post.data.published,
+  author: { '@type': 'Organization', name: post.data.author ?? settings.author },
+  mainEntityOfPage: canonical, ...(socialImage ? { image: socialImage } : {})
+} : undefined;
+---
+<!doctype html>
+<html lang="en" style={{ '--accent': settings.accent, '--font-ui': settings.fontUi, '--font-display': settings.fontDisplay }}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title} — {settings.name}</title>
+    <meta name="description" content={description} />
+    {noindex && <meta name="robots" content="noindex" />}
+    <link rel="canonical" href={canonical} />
+    <link rel="alternate" type="application/rss+xml" title={settings.title} href={href('rss.xml')} />
+    <link rel="sitemap" href={href('sitemap.xml')} />
+    <meta property="og:type" content={post ? 'article' : 'website'} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:site_name" content={settings.name} />
+    <meta property="og:url" content={canonical} />
+    {socialImage && <meta property="og:image" content={socialImage} />}
+    <meta name="twitter:card" content={socialImage ? 'summary_large_image' : 'summary'} />
+    {post && <meta property="article:published_time" content={post.data.published} />}
+    {structuredData && <script type="application/ld+json" set:html={JSON.stringify(structuredData).replace(/</g, '\\u003c')} />}
+    {settings.fontStylesheet && <link rel="stylesheet" href={settings.fontStylesheet} />}
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="site-header">
+      <div class="header-inner">
+        <a class="wordmark" href={settings.homeUrl}>
+          {settings.logo ? <img src={settings.logo} alt="" width="26" height="26" /> : <svg aria-hidden="true" width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 3h12v15H4zM9 8h12v15H9" /></svg>}
+          <span>{settings.name}</span>
+        </a>
+        <nav class="header-nav" aria-label="Main navigation">
+          <a class="blog-link" href={href()} aria-current={!post && !current ? 'page' : undefined}>{settings.title}</a>
+          {settings.pricingUrl && <a href={settings.pricingUrl}>Pricing</a>}
+          <a class="button small" href={settings.appUrl}>Open workspace <span aria-hidden="true">↗</span></a>
+        </nav>
+      </div>
+    </header>
+    <div class="blog-shell">
+      <aside class="category-rail">
+        <nav aria-label="Blog categories">
+          <p class="nav-label">Explore the guides</p>
+          <a class="all-link" href={href()} aria-current={!current && !post ? 'page' : undefined}>All articles</a>
+          <CategoryTree categories={categories} current={current} />
+          <a class="rss-link" href={href('rss.xml')}>Follow via RSS <span aria-hidden="true">↗</span></a>
+        </nav>
+        <p class="rail-note">Learn a little.<br />See a little more.</p>
+      </aside>
+      <div class="content-column">
+        <details class="mobile-categories">
+          <summary>Browse categories</summary>
+          <nav aria-label="Blog categories on small screens">
+            <a class="all-link" href={href()}>All articles</a>
+            <CategoryTree categories={categories} current={current} />
+          </nav>
+        </details>
+        <main id="main" tabindex="-1"><slot /></main>
+      </div>
+    </div>
+    <footer class="site-footer">
+      <a class="wordmark" href={settings.homeUrl}>{settings.name}</a>
+      <span>{settings.title}</span>
+      <a href={href('rss.xml')}>RSS</a>
+      <a href={settings.appUrl}>Open workspace</a>
+    </footer>
+  </body>
+</html>

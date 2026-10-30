@@ -1,0 +1,78 @@
+---
+import { render } from 'astro:content';
+import BlogLayout from '../layouts/BlogLayout.astro';
+import PostCard from '../components/PostCard.astro';
+import { catalog, categoryId, readingTime, displayDate, type Post, type Category } from '../catalog';
+import { settings, href } from '../settings';
+
+export async function getStaticPaths() {
+  const { posts, categories } = await catalog();
+  const routes: { params: { path: string | undefined }; props: Props }[] = posts.map((post) => ({ params: { path: post.id }, props: { post } }));
+  const scopes = [{ id: '', title: settings.title, description: settings.description }, ...categories];
+  for (const scope of scopes) {
+    const matching = scope.id ? posts.filter((post) => post.id.startsWith(scope.id + '/')) : posts;
+    const pages = Math.max(1, Math.ceil(matching.length / settings.pageSize));
+    const prefix = scope.id ? `category/${scope.id}/` : '';
+    for (let page = 1; page <= pages; page++) {
+      routes.push({ params: { path: page === 1 ? prefix.slice(0, -1) || undefined : `${prefix}page/${page}` },
+        props: { scope, page, pages, prefix, listing: matching.slice((page - 1) * settings.pageSize, page * settings.pageSize) } });
+    }
+  }
+  return routes;
+}
+interface Props {
+  post?: Post; scope?: { id: string; title: string; description: string };
+  page?: number; pages?: number; prefix?: string; listing?: Post[];
+}
+const { post, scope, page = 1, pages = 1, prefix = '', listing = [] } = Astro.props;
+const { posts, categories } = await catalog();
+const current = post ? categoryId(post) : scope?.id ?? '';
+const ancestors = current.split('/').map((_, index, parts) => categories.find((item) => item.id === parts.slice(0, index + 1).join('/'))).filter((item): item is Category => !!item);
+const rendered = post ? await render(post) : undefined;
+const Content = rendered?.Content;
+const related = post ? posts.filter((item) => item.id !== post.id)
+  .sort((a, b) => Number(categoryId(b) === current) - Number(categoryId(a) === current)).slice(0, 3) : [];
+const featured = !scope?.id && page === 1 ? listing.find((item) => item.data.featured) : undefined;
+const title = post?.data.title ?? `${scope!.title}${page > 1 ? ` · Page ${page}` : ''}`;
+const description = post?.data.description ?? (scope!.description || `Browse ${scope!.title.toLowerCase()} guides from ${settings.name}.`);
+const pageHref = (number: number) => href(number === 1 ? prefix : `${prefix}page/${number}/`);
+---
+<BlogLayout title={title} description={description} current={current} post={post}>
+  {(post || current) && <nav class="breadcrumbs" aria-label="Breadcrumb">
+    <a href={href()}>{settings.title}</a>
+    {ancestors.map((category) => <><span aria-hidden="true">/</span><a href={href(`category/${category.id}/`)} aria-current={!post && category.id === current ? 'page' : undefined}>{category.title}</a></>)}
+  </nav>}
+  {post && Content ? (
+    <>
+      <article>
+        <header class="article-header">
+          <p class="eyebrow">{ancestors.at(-1)?.title ?? 'Guide'} <span aria-hidden="true">·</span> {readingTime(post)} min read</p>
+          <h1>{post.data.title}</h1>
+          <p class="lead">{description}</p>
+          <p class="byline">{post.data.author ?? settings.author} <span aria-hidden="true">·</span> <time datetime={post.data.published}>{displayDate(post.data.published)}</time>
+            {post.data.updated && <> <span>Updated <time datetime={post.data.updated}>{displayDate(post.data.updated)}</time></span></>}
+          </p>
+        </header>
+        {rendered.headings.some((heading) => heading.depth === 2) && <details class="contents" open>
+          <summary>In this guide</summary>
+          <nav aria-label="Table of contents"><ul>{rendered.headings.filter((heading) => heading.depth === 2).map((heading) => <li><a href={`#${heading.slug}`}>{heading.text}</a></li>)}</ul></nav>
+        </details>}
+        <div class="prose"><Content /></div>
+      </article>
+      <section class="app-cta" aria-labelledby="cta-title">
+        <p class="eyebrow">From reading to doing</p><h2 id="cta-title">Take a closer look.</h2>
+        <p>{settings.ctaDescription}</p><a class="button" href={settings.signupUrl}>{settings.ctaLabel} <span aria-hidden="true">↗</span></a>
+        <a class="existing-account" href={settings.appUrl}>Already have an account? Open workspace</a>
+      </section>
+      {related.length > 0 && <section class="related" aria-labelledby="related-title"><h2 id="related-title" class="section-title">Keep exploring</h2>{related.map((item) => <PostCard post={item} categories={categories} />)}</section>}
+    </>
+  ) : (
+    <>
+      <header class="index-header"><p class="eyebrow">{scope!.id ? 'The guide collection' : 'A little guidance. A fresh perspective.'}</p><h1>{scope!.title}</h1><p class="lead">{description}</p></header>
+      {featured && <PostCard post={featured} categories={categories} featured />}
+      {listing.some((item) => item.id !== featured?.id) && <section aria-labelledby="articles-title"><div class="section-heading"><h2 id="articles-title" class="section-title">{scope!.id ? 'In this category' : 'Latest articles'}</h2><span>Page {page} of {pages}</span></div>{listing.filter((item) => item.id !== featured?.id).map((item) => <PostCard post={item} categories={categories} />)}</section>}
+      {listing.length === 0 && <p class="empty-state">The first guide is on its way. <a href={settings.appUrl}>Explore the app</a> in the meantime.</p>}
+      {pages > 1 && <nav class="pagination" aria-label="Pagination">{page > 1 && <a rel="prev" href={pageHref(page - 1)}>← Newer articles</a>}<span>Page {page} of {pages}</span>{page < pages && <a rel="next" href={pageHref(page + 1)}>Older articles →</a>}</nav>}
+    </>
+  )}
+</BlogLayout>
