@@ -19,6 +19,12 @@ Edit `site.config.json`, replace the example under `blogposts/`, and run `bun ru
 
 `bun run check` checks TypeScript and Astro templates. `bun test` builds a disposable second app and verifies nested routes, relative links and media, pagination, drafts, metadata, redirects, and invalid-content failures. The workflow in `.github/workflows/ci.yml` runs these checks and a standalone build. It does not deploy.
 
+## Amp orbs
+
+Once the executable `.agents/setup` and `.agents/resume` scripts are on the project's default branch, Amp can cache a prepared orb snapshot. Setup installs Node 24 and Bun 1.3.10 to a user-local toolchain directory, makes them available in repository login shells, and runs `bun install --frozen-lockfile`. Repeated setup runs reuse the installed toolchain and dependencies. Resume only checks readiness; it never installs packages. No secrets, databases, or authentication are needed.
+
+Run `.agents/setup` to prepare or repair an orb manually. Then use the normal check, test, build, and dev commands above. Setup does not start a development server; run it as a supervised orb service when needed.
+
 ## Configuration and reuse
 
 `BLOG_CONFIG=/absolute/path/to/config.json bun run build` supplies another app's configuration. Relative `contentDir` and `outDir` paths resolve from **that configuration file**, not from the engine directory.
