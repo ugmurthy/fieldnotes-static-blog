@@ -2,7 +2,11 @@
 
 An independent Astro/TypeScript blog template. Markdown and nested folders become public HTML pages. No login, database, browser Markdown parser, or app JavaScript is required. Use this directory as the root of its own GitHub repository; it contains its own package manifest, lockfile, example content, tests, and GitHub Actions workflow.
 
-Upstream: [ugmurthy/fieldnotes-static-blog](https://github.com/ugmurthy/fieldnotes-static-blog) (private; GitHub access is required to clone).
+Upstream: [ugmurthy/fieldnotes-static-blog](https://github.com/ugmurthy/fieldnotes-static-blog) (public).
+
+## License
+
+Released under the [MIT License](LICENSE). You may use, modify, and vendor this engine in open-source or proprietary applications, including commercial products. Preserve the copyright and license notice with vendored copies. Third-party dependencies retain their own licenses.
 
 ## Standalone quick start
 
@@ -33,7 +37,82 @@ Required fields are shown in `site.config.json`. `site` is the canonical product
 
 Branding fields: `name`, `title`, `description`, `accent` (six-digit hex), optional `logo`, `fontUi`, `fontDisplay`, and `fontStylesheet`. System fonts work without external requests. Optional `socialImage` should be a publicly served image URL. App links are `homeUrl`, `appUrl`, `signupUrl`, optional `pricingUrl`, `ctaLabel`, and `ctaDescription`. These must be site-relative paths or HTTP(S) URLs. Set `author` for the default byline. Listings use `pageSize` (1–50, default 10).
 
-To embed in another application, keep a pinned copy of this engine, point it at that app's root `blogposts/`, build the app first, then the blog into `app-dist/blog/`, and serve `/blog/` before any app fallback. The app should link to the blog with ordinary anchors, never import the engine or a content manifest. More articles increase build time and deployment size, not app startup downloads. No article prefetching is enabled.
+These are supported configuration-based styling controls, not an arbitrary CSS override API. The schema rejects unknown fields; host app styles do not automatically apply to the blog's independent HTML pages. Avoid editing vendored engine CSS if you want clean upgrades.
+
+The app should link to the blog with ordinary anchors, never import the engine or a content manifest. More articles increase build time and deployment size, not app startup downloads. No article prefetching is enabled.
+
+## Add Fieldnotes to an existing app
+
+The agent-friendly workflow keeps a pinned engine in `vendor/fieldnotes`, with app-owned `blog.config.json` and `blogposts/` outside it. Install the reusable [integrating-blogsite skill](.agents/skills/integrating-blogsite/SKILL.md#install) by copying its **complete directory from a reviewed, full-commit-pinned Git checkout**. The linked recipe validates all four required files and refuses existing destinations, including symlinks; it does not execute downloaded code. Prefer the host root's `.agents/skills/integrating-blogsite`. A manual whole-directory global copy to `~/.config/agents/skills/integrating-blogsite` is optional.
+
+Convenient alternative, from the host root:
+
+```sh
+amp skill add ugmurthy/fieldnotes-static-blog/.agents/skills/integrating-blogsite
+```
+
+**Verify both `scripts/vendor.mjs` and `reference/integration.md` are present under the installed skill.** Some Amp CLI versions copy only `SKILL.md` despite reporting success; GitHub-import resource handling is not assumed verified. Recover missing resources from a reviewed pinned checkout as described in `SKILL.md`. With `--global`, use script paths relative to the global skill directory instead.
+
+### Vendor a reviewed revision
+
+Once the skill/script is available, run these commands from the host app root. Replace `REF` with a reviewed **full 40-character commit SHA**. No release tags exist currently; use a full commit until releases are tagged. The script also accepts `vSemVer` tags when available, resolving them to immutable commits. `package.json` currently declares `0.1.0`; this is not a claim that `v0.1.0` has been published.
+
+```sh
+REF='<full-40-character-commit-SHA>'
+node .agents/skills/integrating-blogsite/scripts/vendor.mjs install --app "$PWD" --ref "$REF" --dry-run
+node .agents/skills/integrating-blogsite/scripts/vendor.mjs install --app "$PWD" --ref "$REF"
+node .agents/skills/integrating-blogsite/scripts/vendor.mjs status --app "$PWD"
+```
+
+The dependency-free Node script's [complete interface](.agents/skills/integrating-blogsite/SKILL.md#install) supports `install`, `update`, and local `status`. `--app` defaults to the current directory. Install/update require explicit `--ref`; branches and short SHAs are not supported. Install's default source is `https://github.com/ugmurthy/fieldnotes-static-blog.git`. Use `--source` for another reviewed HTTPS Git URL or local Git repository; updates use the recorded source and cannot change it.
+
+Only allowlisted engine files are installed, including the MIT `LICENSE`. App-root `fieldnotes.lock.json` records source, immutable commit, requested ref, engine version, and SHA256 managed-file hashes; review and commit it with the engine. Installation creates `blog.config.json` when absent, preserving existing articles. It seeds `blogposts/getting-started/welcome.md` only when creating config **and** `blogposts/` is absent. Config defaults are base `/blog` and dedicated app-root output `.fieldnotes-dist`; existing config is preserved.
+
+The script does **not** install dependencies, edit host package scripts, routing, or gitignore, or provide a force option. It does not push or deploy. Keep the vendored license notice when redistributing the engine.
+
+### Integrate with the host build and routes
+
+Inspect the host before changing its build. Use Node 24 and Bun 1.3.10. Bootstrap engine dependencies separately; do not merge them into the app's manifest/lockfile. With Bun workspaces, `--cwd` alone does **not** guarantee isolation: inspect whether workspace globs include `vendor/fieldnotes`. The [integration reference](.agents/skills/integrating-blogsite/reference/integration.md#dependency-isolation-inspect-the-host-workspace) records tested Bun behavior and a detached-build alternative.
+
+If the engine is outside host workspace membership, run from the host root:
+
+```sh
+APP_ROOT="$PWD"
+bun install --cwd "$APP_ROOT/vendor/fieldnotes" --frozen-lockfile
+BLOG_CONFIG="$APP_ROOT/blog.config.json" bun run --cwd "$APP_ROOT/vendor/fieldnotes" check
+BLOG_CONFIG="$APP_ROOT/blog.config.json" bun run --cwd "$APP_ROOT/vendor/fieldnotes" test
+BLOG_CONFIG="$APP_ROOT/blog.config.json" bun run --cwd "$APP_ROOT/vendor/fieldnotes" build
+```
+
+Vendored `bun test` runs the engine's allowlisted `tests/site.test.mjs`, not the CLI fixture tests; it does not validate host routing.
+
+Use an **absolute `BLOG_CONFIG`**. Set production origin, branding/app links, content location, non-root base, and output in the host's config before publishing. Relative content/output paths resolve from that config. `base` sets URLs; it does not add a `blog/` directory inside output. Mount the output's contents at the configured base.
+
+Choose build order to match the host:
+
+- **Host copies `public/` during build:** use a blog-owned `public/blog/` subtree (or copy `.fieldnotes-dist` contents there) **before** the host build.
+- **Host accepts final static output:** build the host **first**, then build/copy the blog into a blog-owned `<host-output>/blog/` subtree. Some adapters require a supported public-assets integration rather than a final folder copy.
+
+**Astro clears `outDir`. An unsafe value can erase host data.** Never point it at the app root, content, all of `public/`, or the host's whole output directory. Reserve a blog-only subtree and check route/asset collisions. The [integration reference](.agents/skills/integrating-blogsite/reference/integration.md) covers build/copy recipes, supported styling, routing, validation, and generated-file ignore examples.
+
+Serve blog static files and blog-specific **HTTP 404s before any SPA fallback**, preserving non-blog app routes. Validate the actual served app's blog index, nested articles, assets/links, missing-blog-route 404, and existing app routes. Engine checks alone do not prove host routing. Add focused build/route tests; screenshots/visual tests are needed only when changing visual integration.
+
+Extend the host's existing CI/orb dependency bootstrap and build steps. Do not copy this repository's `.agents/setup`, `.agents/resume`, or `.github/workflows/` over the host's lifecycle/CI files. Review generated-file ignores manually; the installer does not change them. Builds use the checked-in engine, not an upstream download during deployment.
+
+### Upgrade deliberately
+
+```sh
+node .agents/skills/integrating-blogsite/scripts/vendor.mjs status --app "$PWD"
+NEXT_REF='<reviewed-full-40-character-commit-SHA>'
+node .agents/skills/integrating-blogsite/scripts/vendor.mjs update --app "$PWD" --ref "$NEXT_REF" --dry-run
+node .agents/skills/integrating-blogsite/scripts/vendor.mjs update --app "$PWD" --ref "$NEXT_REF"
+```
+
+`status` is local-only and never fetches. It exits 1 for modified/missing managed engine files or untracked extra engine files, ignoring generated `node_modules`, `.astro`, and `dist` directories. `update --dry-run` fetches/previews the target without changing host files. Review the [changelog](CHANGELOG.md), upstream changes, and any config/content migrations manually before updating.
+
+Update stages engine replacement, refuses tracked-file drift and unexpected extra files, preserves config/articles, and clears disposable vendor dependency/build caches. Reinstall locked engine dependencies, apply reviewed manual migrations, and repeat host build/route checks. On drift, stop and review local work rather than deleting it. Roll back engine and `fieldnotes.lock.json` together to a known-good host Git revision, protect unrelated pending changes, and handle any associated migration coherently. Rollback also needs dependency bootstrap and a fresh verified build; no autopush or deployment is performed.
+
+Engine updates do **not** update the installed skill/script. Review/protect local skill changes, fetch a new reviewed pinned checkout, then intentionally replace the **whole directory**, as described in the [skill-maintenance guidance](.agents/skills/integrating-blogsite/reference/integration.md#install-and-maintain-the-complete-skill). `amp skill add … --overwrite` is an optional convenience, not a guarantee of refreshed resources: verify script/reference against that checkout. Reload skills only after the replacement is complete; this does not itself upgrade the pinned engine.
 
 ## Writing articles
 
@@ -87,8 +166,8 @@ The target must be a published article and the old path must be unused. Static o
 
 ## Publishing this as its own repository
 
-Copy **this directory's source** to a clean checkout (exclude `node_modules/`, `.astro/`, and `dist/`). Its `bun.lock` is independent of the parent app's workspace lock. Run the standalone checks above before publishing. `.github/workflows/ci.yml` becomes active only when this directory is the repository root.
+Copy **this directory's source** to a clean checkout (exclude `node_modules/`, `.astro/`, and `dist/`). Its `bun.lock` is intended for an independent engine install; do not include the engine in a consuming app's workspace membership (see dependency isolation above). Run the standalone checks above before publishing. `.github/workflows/ci.yml` becomes active only when this directory is the repository root.
 
 Keep app-specific branding and articles in consuming applications; the example configuration/content here is intentionally generic. Record the engine commit or release used by each app. This version is `0.1.0`. Update vendored copies deliberately from a reviewed upstream release/commit rather than downloading an unpinned branch during deployment. No GitHub credentials or remote are needed to build or deploy a local copy.
 
-Repository creation, visibility, license, and publishing are owner decisions; this template does not create a remote or deploy automatically.
+Repository creation, visibility, and publishing are owner decisions; this template does not create a remote or deploy automatically.
