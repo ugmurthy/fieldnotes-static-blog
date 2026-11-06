@@ -8,8 +8,8 @@ const schema = z.object({
   site: z.url().refine((value) => /^https?:\/\//.test(value)),
   base: z.string().regex(/^\/$|^\/[a-z0-9-]+(?:\/[a-z0-9-]+)*\/?$/),
   contentDir: z.string().min(1), outDir: z.string().min(1),
-  homeUrl: link, appUrl: link, signupUrl: link, pricingUrl: link.optional(),
-  ctaLabel: z.string().min(1), ctaDescription: z.string().min(1),
+  homeUrl: link.optional(), appUrl: link.optional(), signupUrl: link.optional(), pricingUrl: link.optional(),
+  ctaLabel: z.string().min(1).default('Get started'), ctaDescription: z.string().min(1).optional(),
   author: z.string().min(1), accent: z.string().regex(/^#[0-9a-fA-F]{6}$/),
   socialImage: link.optional(), logo: link.optional(),
   fontUi: z.string().default('Inter, system-ui, sans-serif'),
@@ -20,7 +20,11 @@ const schema = z.object({
 }).strict();
 
 const filename = resolve(process.env.BLOG_CONFIG ?? 'site.config.json');
-export const settings = schema.parse(JSON.parse(readFileSync(filename, 'utf8')));
+export const settings = schema.parse({
+  ...JSON.parse(readFileSync(filename, 'utf8')),
+  ...(process.env.BLOG_SITE && { site: process.env.BLOG_SITE }),
+  ...(process.env.BLOG_BASE && { base: process.env.BLOG_BASE })
+});
 export const contentDir = resolve(dirname(filename), settings.contentDir);
 export const outDir = resolve(dirname(filename), settings.outDir);
 if (contentDir === outDir || contentDir.startsWith(outDir + sep) || outDir.startsWith(contentDir + sep)) {

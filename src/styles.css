@@ -79,6 +79,7 @@ h1 { font: 500 48px/1.1 var(--font-display); letter-spacing: -.025em; margin-top
 .prose img { border-radius: 8px; }
 .app-cta { border: 1px solid var(--line); border-radius: 14px; padding: 30px 32px; margin-block: 48px; background: var(--surface); }
 .app-cta h2 { font: 500 32px/1.2 var(--font-display); margin-top: 10px; }
+.app-cta h2 + .button { margin-top: 18px; }
 .app-cta > p:not(.eyebrow) { color: #4b4943; margin: 12px 0 22px; max-width: 550px; }
 .existing-account { display: block; font-size: 12px; margin-top: 16px; color: var(--muted); }
 .pagination { display: flex; gap: 24px; flex-wrap: wrap; justify-content: space-between; padding-top: 28px; }

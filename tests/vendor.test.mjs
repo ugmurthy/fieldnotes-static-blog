@@ -30,7 +30,8 @@ function app(name) {
 
 beforeAll(() => {
   mkdirSync(source);
-  for (const path of ['src', 'package.json', 'bun.lock', 'astro.config.ts', 'tsconfig.json', 'site.config.json', 'LICENSE', 'tests/site.test.mjs']) {
+  for (const path of ['src', 'package.json', 'bun.lock', 'astro.config.ts', 'tsconfig.json', 'site.config.json', 'LICENSE', 'tests/site.test.mjs',
+    'netlify.toml', 'vercel.json', '.github/workflows/pages.yml']) {
     mkdirSync(dirname(join(source, path)), { recursive: true });
     cpSync(join(root, path), join(source, path), { recursive: true });
   }
@@ -69,6 +70,10 @@ test('install, customize, preview and upgrade a real engine without changing hos
   const engine = join(target, 'vendor/fieldnotes');
   expect(existsSync(join(target, '.agents/setup'))).toBe(false);
   expect(existsSync(join(engine, '.agents'))).toBe(false);
+  for (const path of ['netlify.toml', 'vercel.json', '.github']) {
+    expect(existsSync(join(engine, path))).toBe(false);
+    expect(existsSync(join(target, path))).toBe(false);
+  }
   expect(read(join(engine, 'LICENSE'))).toBe(read(join(root, 'LICENSE')));
   expect(existsSync(join(engine, 'tests/site.test.mjs'))).toBe(true);
   expect(existsSync(join(engine, 'tests/vendor.test.mjs'))).toBe(false);

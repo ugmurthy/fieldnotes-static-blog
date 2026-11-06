@@ -12,6 +12,8 @@ const output = join(temporary, 'output');
 const configFile = join(temporary, 'site.json');
 const config = { ...JSON.parse(readFileSync(join(root, 'site.config.json'), 'utf8')),
   name: 'Another app', site: 'https://another.example', base: '/learn',
+  homeUrl: 'https://example.com', appUrl: 'https://example.com/app', signupUrl: 'https://example.com/signup',
+  ctaLabel: 'Try the app', ctaDescription: 'Put what you have learned into practice.',
   contentDir: content, outDir: output, pageSize: 2,
   redirects: { 'old-first': 'guides/nested/first' } };
 function write(path, value) {
@@ -21,9 +23,10 @@ function write(path, value) {
 function article(title, date, body = '', extra = '') {
   return `---\ntitle: "${title}"\ndescription: "A useful guide for another app"\npublished: "${date}"\n${extra}\n---\n\n## A real heading\n\n${body}\n`;
 }
-function build() {
-  writeFileSync(configFile, JSON.stringify(config));
-  return spawnSync('bun', ['run', 'build'], { cwd: root, env: { ...process.env, BLOG_CONFIG: configFile }, encoding: 'utf8', timeout: 60000 });
+function build(overrides = {}, env = {}) {
+  writeFileSync(configFile, JSON.stringify({ ...config, ...overrides }));
+  return spawnSync('bun', ['run', 'build'], { cwd: root,
+    env: { ...process.env, BLOG_SITE: '', BLOG_BASE: '', BLOG_CONFIG: configFile, ...env }, encoding: 'utf8', timeout: 60000 });
 }
 const html = (path) => readFileSync(join(output, path), 'utf8');
 
@@ -76,11 +79,65 @@ test('discovery metadata, conversion links, moved articles, and not-found page a
   const body = html('guides/nested/first/index.html');
   expect(body).toContain('"@type":"BlogPosting"');
   expect(body).toContain('href="https://example.com/signup"');
+  expect(body).toContain('Open workspace');
+  expect(body).toContain('Try the app');
+  expect(body).toContain('Put what you have learned into practice.');
+  expect(body).toContain('Already have an account?');
   expect(html('rss.xml')).toContain('<title>First &amp; foremost</title>');
   expect(html('sitemap.xml')).toContain('https://another.example/learn/category/guides/nested/');
   expect(html('old-first/index.html')).toContain('/learn/guides/nested/first/');
   expect(html('404.html')).toContain('content="noindex"');
 });
+
+test('standalone root and project sites honor hosting URLs without app UI', () => {
+  const standalone = { appUrl: undefined, signupUrl: undefined, pricingUrl: undefined,
+    ctaLabel: undefined, ctaDescription: undefined, homeUrl: undefined };
+  for (const base of ['/', '/personal-blog']) {
+    const prefix = base === '/' ? '' : base;
+    const result = build(standalone, { BLOG_SITE: 'https://writer.github.io', BLOG_BASE: base });
+    expect(result.status).toBe(0);
+    const body = html('guides/nested/first/index.html');
+    expect(body).toContain(`https://writer.github.io${prefix}/guides/nested/first/`);
+    expect(body).toContain(`class="wordmark" href="${prefix}/"`);
+    expect(body).toContain(`href="${prefix}/guides/second/#a-real-heading"`);
+    expect(body).toContain(`src="${prefix}/_media/guides/nested/sample.svg"`);
+    expect(html('rss.xml')).toContain(`https://writer.github.io${prefix}/guides/nested/first/`);
+    expect(html('sitemap.xml')).toContain(`https://writer.github.io${prefix}/category/guides/nested/`);
+    expect(html('old-first/index.html')).toContain(`${prefix}/guides/nested/first/`);
+    for (const path of ['index.html', 'category/guides/index.html', 'guides/nested/first/index.html', '404.html']) {
+      const page = html(path);
+      expect(page).not.toContain('Open workspace');
+      expect(page).not.toContain('class="app-cta"');
+      expect(page).not.toContain('example.com/signup');
+      expect(page).not.toContain('href="undefined"');
+    }
+    expect(existsSync(join(output, '_media/guides/nested/sample.svg'))).toBe(true);
+  }
+  const empty = join(temporary, 'empty-content');
+  mkdirSync(empty);
+  const result = build({ ...standalone, contentDir: empty, redirects: {} });
+  expect(result.status).toBe(0);
+  expect(html('index.html')).toContain('The first guide is on its way.');
+  expect(html('index.html')).not.toContain('Explore the app');
+  expect(html('index.html')).not.toContain('in the meantime.');
+}, 60000);
+
+test('workspace links and signup CTA can be enabled independently', () => {
+  let result = build({ signupUrl: undefined });
+  expect(result.status).toBe(0);
+  let body = html('guides/nested/first/index.html');
+  expect(body).toContain('Open workspace');
+  expect(body).not.toContain('class="app-cta"');
+
+  result = build({ appUrl: undefined, ctaLabel: undefined, ctaDescription: undefined });
+  expect(result.status).toBe(0);
+  body = html('guides/nested/first/index.html');
+  expect(body).toContain('href="https://example.com/signup"');
+  expect(body).toContain('Get started');
+  expect(body).not.toContain('Open workspace');
+  expect(body).not.toContain('Already have an account?');
+  expect(body).not.toContain('<p></p>');
+}, 60000);
 
 test('build rejects broken Markdown links and links to unpublished articles', () => {
   write('broken.md', article('Broken', '2026-10-30', '[Missing](./missing.md)'));

@@ -1,6 +1,6 @@
-# Fieldnotes: a reusable static app blog
+# Fieldnotes: a reusable static blog
 
-An independent Astro/TypeScript blog template. Markdown and nested folders become public HTML pages. No login, database, browser Markdown parser, or app JavaScript is required. Use this directory as the root of its own GitHub repository; it contains its own package manifest, lockfile, example content, tests, and GitHub Actions workflow.
+An independent Astro/TypeScript blog template for standalone sites or integration into webapps. Markdown and nested folders become public HTML pages. No login, database, browser Markdown parser, or app JavaScript is required. Use this directory as the root of its own GitHub repository; it contains its own package manifest, lockfile, example content, tests, and hosting configuration.
 
 Upstream: [ugmurthy/fieldnotes-static-blog](https://github.com/ugmurthy/fieldnotes-static-blog) (public).
 
@@ -12,16 +12,183 @@ Released under the [MIT License](LICENSE). You may use, modify, and vendor this 
 
 Requires Node 24 and Bun (CI uses Bun 1.3.10).
 
-Clone the repository, then run these commands from its root:
+### Create your repository from the template
 
-```sh
+For **`https://ugmurthy.github.io/blog/`**, create the separate repository **`ugmurthy/blog`**. Do **not** replace or delete files in `ugmurthy/ugmurthy.github.io`; that repository continues serving the existing homepage. GitHub Pages mounts the new project site's output at `/blog/`.
+
+1. The engine repository's owner must first enable **Settings → General → Template repository** in `ugmurthy/fieldnotes-static-blog`. This GitHub setting is not enabled by committing these files.
+2. On the [engine repository](https://github.com/ugmurthy/fieldnotes-static-blog), choose **Use this template → Create a new repository**, owner **ugmurthy**, name **blog**, visibility **Public**. Copy the default branch only. Substitute your own account/repository when adapting this example.
+3. Clone the new repository. No manual source-file copying is needed:
+
+```sh copy Copy Template Clone
+git clone https://github.com/ugmurthy/blog.git
+cd blog
+```
+
+All paths below are relative to this **new repository's root**:
+
+| Path | Ownership and purpose |
+| --- | --- |
+| `src/` | Blog engine source: layouts, routing, styles, and Markdown processing. No extra `blogsite/` directory is needed. |
+| `astro.config.ts`, `package.json`, `bun.lock`, `tsconfig.json` | Engine build configuration and dependencies. Keep the manifest and lockfile together during upgrades. |
+| `blogposts/` | **Your content**: nested category folders, `.md` articles, and colocated images/videos/downloads. |
+| `site.config.json` | **Your configuration**: branding, author, origin, `/blog` base, and optional app links. |
+| `public/` (optional) | Your additional static assets; use article-relative media in `blogposts/` when possible. |
+| `.github/workflows/`, `netlify.toml`, `vercel.json` | Deployment configuration to review for your chosen host. |
+| `fieldnotes-upstream.txt` | Reviewed engine revision, recorded below for future template upgrades. |
+| `dist/` | Generated HTML/assets; ignored by Git. Publish its **contents**, not source files. |
+
+### Record the starting engine revision
+
+A GitHub template creates **independent Git history**, not a fork or an automatic update subscription. Record the starting engine commit before changing engine files. From the freshly cloned `blog` repository:
+
+```sh copy Copy Upstream Baseline
+git remote add fieldnotes https://github.com/ugmurthy/fieldnotes-static-blog.git
+git fetch fieldnotes main
+REF=$(git rev-parse fieldnotes/main)
+git diff --exit-code "$REF" HEAD -- src astro.config.ts package.json bun.lock tsconfig.json tests/site.test.mjs LICENSE \
+  && printf '%s\n' "$REF" > fieldnotes-upstream.txt
+```
+
+The comparison must be empty. If the engine changed after you created the template, stop: set `REF` to the exact full commit used to create it, repeat the comparison, and record that commit only when it matches. Do not record the newest upstream commit against older engine files. Commit `fieldnotes-upstream.txt` with your initial blog configuration; keep the `fieldnotes` remote for upgrades (`origin` remains your own repository).
+
+### Configure, write, and check locally
+
+Replace `site.config.json` with the [standalone configuration](#standalone-configuration) below and replace the starter articles with your own. Then run from the repository root:
+
+```sh copy Copy Local Checks
 bun install --frozen-lockfile
+bun run check
+bun test
+bun run build
 bun run dev
 ```
 
-Edit `site.config.json`, replace the example under `blogposts/`, and run `bun run build`. Publish the contents of `dist/` using any static host. Run `bun run preview` to inspect production output. Configure the host to serve `404.html` with HTTP status 404, not fall back to a single-page app.
+`bun run dev` stays running until you stop it. Alternatively, use `bun run preview` after building to inspect production output. Follow [GitHub Pages](#github-pages) below to enable publishing; template creation alone does not deploy anything. The same source also works on [Netlify](#netlify) or [Vercel](#vercel).
+
+After checking the site, stop the local server, complete your chosen host's setup, then commit and push to **your `blog` repository**. Also stage any additional public assets you created:
+
+```sh copy Copy Publish Blog Configuration
+git add site.config.json fieldnotes-upstream.txt blogposts
+git diff --cached
+git commit -m "Configure standalone blog"
+git push origin main
+```
 
 `bun run check` checks TypeScript and Astro templates. `bun test` builds a disposable second app and verifies nested routes, relative links and media, pagination, drafts, metadata, redirects, and invalid-content failures. The workflow in `.github/workflows/ci.yml` runs these checks and a standalone build. It does not deploy.
+
+### Standalone configuration
+
+The checked-in `site.config.json` demonstrates app integration. For the standalone `ugmurthy/blog` project site, replace it with this configuration and customize the branding:
+
+```json copy Copy Standalone Configuration
+{
+  "name": "My blog",
+  "title": "Articles & notes",
+  "description": "Ideas, guides, and things worth sharing.",
+  "site": "https://ugmurthy.github.io",
+  "base": "/blog",
+  "contentDir": "./blogposts",
+  "outDir": "./dist",
+  "author": "Your name",
+  "accent": "#3050d0"
+}
+```
+
+Keep Markdown and colocated media in `blogposts/`, with folders for categories. Each push rebuilds the static site when deployment is enabled; visitors do not fetch or parse Markdown from GitHub. Required article frontmatter and naming rules are described under [Writing articles](#writing-articles).
+
+Omit `appUrl` to hide workspace links, and omit `signupUrl` to hide the article call to action. Omit `pricingUrl` to hide Pricing. `homeUrl` defaults to the blog index, including its base path. Existing webapp configurations continue to work unchanged; these are independently optional features, not a separate engine or theme.
+
+### Future engine updates for a template-created blog
+
+There is no automatic template sync. Use the recorded upstream commit to apply **only core engine changes**, including added/deleted files, while leaving `blogposts/`, `site.config.json`, and `public/` alone. Do **not** run `git pull fieldnotes main --allow-unrelated-histories`: that mixes the template's example content/configuration into your site. The webapp `vendor.mjs update` command further below is for a vendored engine, **not** this root-level template layout.
+
+Start on your up-to-date `main` with a **clean worktree** and a committed `fieldnotes-upstream.txt`. Commands in this section run in the same shell, from your `blog` repository. Fetch upstream, choose a reviewed full 40-character commit, and inspect the change before applying it:
+
+```sh copy Copy Review Engine Update
+git switch main
+git pull --ff-only origin main
+git status --short
+git fetch fieldnotes main --tags
+OLD=$(cat fieldnotes-upstream.txt)
+NEXT='<reviewed-full-40-character-commit-SHA>'
+git diff "$OLD" "$NEXT" -- CHANGELOG.md README.md
+git diff --stat "$OLD" "$NEXT" -- src astro.config.ts package.json bun.lock tsconfig.json tests/site.test.mjs LICENSE
+git diff "$OLD" "$NEXT" -- src astro.config.ts package.json bun.lock tsconfig.json tests/site.test.mjs LICENSE
+```
+
+If `git status` shows pending work, commit or safely set it aside **before continuing**. Review required configuration/content migrations in the upstream notes; apply them deliberately to your files. No version tags are currently published, so use a full commit SHA. If the core engine diff is empty, there is no core update to apply.
+
+For a nonempty core diff, create a new upgrade branch and apply a three-way patch:
+
+```sh copy Copy Apply Engine Update
+git switch -c update-fieldnotes
+git diff --binary "$OLD" "$NEXT" -- src astro.config.ts package.json bun.lock tsconfig.json tests/site.test.mjs LICENSE \
+  | git apply --3way --index
+```
+
+This works across independent template history because it uses the fetched Git blobs, not shared branch ancestry. It preserves nonconflicting local engine customizations; overlapping edits may produce conflicts. **Stop on any error or conflict**, inspect `git status`, resolve the affected files, and stage the resolutions. Do not advance the marker or publish until resolved. Do not overwrite whole engine directories from upstream: that can lose local changes or leave removed files behind.
+
+Hosting files, other tooling/tests, and documentation are deliberately outside this core update. Separately review upstream changes to `.github/`, `netlify.toml`, `vercel.json`, `.agents/`, `tests/vendor.test.mjs`, and `.gitignore`, and incorporate relevant changes manually. In particular, review workflow permissions/commands and any new toolchain requirements before adopting them. Keep the MIT license notice.
+
+After resolving the patch and any required migrations, validate with the toolchain required by the new revision:
+
+```sh copy Copy Validate Engine Update
+bun install --frozen-lockfile
+bun run check
+bun test
+bun run build
+bun run preview
+```
+
+Inspect `/blog/`, a nested article and its media, RSS, and a missing-route 404 using a preview/static server that honors the configured base and real HTTP 404s. Confirm your articles, branding, and optional app links remain correct. Only after all checks pass, stop the preview and record/commit the reviewed revision. Stage any deliberately migrated config/content or manually adopted hosting files too, before committing:
+
+```sh copy Copy Record Engine Update
+printf '%s\n' "$NEXT" > fieldnotes-upstream.txt
+git add fieldnotes-upstream.txt
+git diff --cached
+git status --short
+git commit -m "Upgrade Fieldnotes engine to $NEXT"
+git push -u origin update-fieldnotes
+```
+
+Open a pull request to your `main`, review it and its CI checks, then merge when ready; the enabled host deploys the merged revision. Delete the merged upgrade branch before reusing its name. To roll back, revert the upgrade commit (including the marker and associated migrations), reinstall locked dependencies, rerun the checks, and publish through the same reviewed process. Never discard unrelated content changes to undo an engine update.
+
+## Standalone hosting
+
+These configurations assume this repository is the host's project root, with `outDir: "./dist"`. They publish static files, including `404.html`; do not add an SPA catch-all rewrite. No Netlify or Vercel server adapter is required. Hosting setup is opt-in: adding these files does not create hosting projects or enable deployment by itself.
+
+`BLOG_SITE` and `BLOG_BASE` override `site` and `base` at build time and use the same validation. `BLOG_SITE` should be the production origin without a path; `BLOG_BASE` is `/` or a mount path such as `/my-blog`. They also apply when using `BLOG_CONFIG`. Unset or empty overrides leave the JSON values unchanged. These overrides do not rewrite explicitly configured external/app URLs such as `homeUrl`.
+
+### GitHub Pages
+
+1. Complete the [template setup](#create-your-repository-from-the-template) in **`ugmurthy/blog`**, with `site: "https://ugmurthy.github.io"` and `base: "/blog"`. These instructions do not change the existing `ugmurthy.github.io` repository or its Pages settings. For a root user site instead, the repository would be `ugmurthy.github.io` and the base `/`.
+2. In the **new `blog` repository**, set **Settings → Pages → Build and deployment → Source** to **GitHub Actions**. Enable Actions if disabled, and ensure the **github-pages** environment's deployment rules permit `main`.
+3. In that same repository, add the Actions **variable** (not a secret) **`DEPLOY_GITHUB_PAGES`** with value **`true`** under **Settings → Secrets and variables → Actions → Variables**.
+4. Push to `main` (adjust the branch in `.github/workflows/pages.yml` if needed), or run the **GitHub Pages** workflow manually.
+5. Wait for **Actions → GitHub Pages → deploy** to succeed, then visit **`https://ugmurthy.github.io/blog/`**. Later pushes to `main` rebuild and publish automatically; there is no manual HTML copying.
+
+The opt-in workflow installs locked dependencies with Node 24 and Bun 1.3.10, checks and tests the engine, builds, uploads `dist/`, and deploys it to Pages. It reads the configured Pages origin and base path automatically, covering user sites, project subpaths, and configured custom domains. It does not create or enable a Pages site. Set the corresponding `site`/`base` in JSON as well when you want local builds to match production.
+
+The existing verification workflow remains independent and runs on pull requests. The Pages workflow never deploys pull requests. GitHub Pages serves the generated `404.html` for missing routes; no branch of committed generated HTML or Jekyll build is needed. The artifact contains the contents of `dist/` directly: do not add a second `blog/` directory inside it, and do not add a CNAME for `ugmurthy.github.io`.
+
+### Netlify
+
+Import the standalone repository into Netlify with the repository root as its base directory. The included `netlify.toml` supplies build command `bun run build`, publish directory `dist`, Node 24, Bun 1.3.10, and frozen-lockfile dependency installation. Choose the production branch in Netlify.
+
+Set `site` in JSON or the Netlify build environment variable `BLOG_SITE` to your production origin (for example, `https://my-blog.netlify.app` or your custom domain). Normally use `base: "/"`; clear any inherited `BLOG_BASE` intended for GitHub Pages. Netlify serves the root `404.html` as its custom not-found page without a catch-all redirect.
+
+### Vercel
+
+Import the standalone repository into Vercel with the repository root as its root directory. The included `vercel.json` selects Astro, frozen-lockfile installation, build command `bun run build`, output directory `dist`, and trailing-slash URLs. `package.json` selects Node 24; Vercel supplies Bun 1.x based on `bun.lock` (CI verifies Bun 1.3.10).
+
+Set `site` in JSON or the Vercel build environment variable `BLOG_SITE` to your production origin (for example, `https://my-blog.vercel.app` or your custom domain). Normally use `base: "/"`. Vercel serves the root `404.html` for missing static routes; no function or SPA rewrite is needed.
+
+On Netlify and Vercel, explicitly choose whether environment overrides apply to production, previews, or both. Keep the production canonical origin for previews unless you intentionally want preview-specific canonical/RSS/sitemap URLs. Confirm a nested article, its media, RSS, and a missing-route HTTP 404 after the first deployment; local builds do not verify provider settings.
+
+### Preserve webapp integration
+
+Standalone hosting files (`netlify.toml`, `vercel.json`, and `.github/workflows/pages.yml`) are excluded by the existing vendoring allowlist. They do not replace a consuming app's deployment or build settings. Continue using app-owned `blog.config.json`, content, and output paths through `BLOG_CONFIG`, as described below; the same engine still supports a `/blog` mount.
 
 ## Amp orbs
 
@@ -33,9 +200,9 @@ Run `.agents/setup` to prepare or repair an orb manually. Then use the normal ch
 
 `BLOG_CONFIG=/absolute/path/to/config.json bun run build` supplies another app's configuration. Relative `contentDir` and `outDir` paths resolve from **that configuration file**, not from the engine directory.
 
-Required fields are shown in `site.config.json`. `site` is the canonical production origin; `base` is `/` for a standalone site or a mount point such as `/blog`. Do not include the base in article filenames. `outDir` is a dedicated blog output directory: Astro clears it on build, so never point it at the app's entire output or at source files.
+The [standalone configuration](#standalone-configuration) shows the required fields; `site.config.json` additionally demonstrates optional app features. `site` is the canonical production origin; `base` is `/` for a root site or a mount point such as `/blog` for a standalone project site or an integrated webapp. Do not include the base in article filenames. `outDir` is a dedicated blog output directory: Astro clears it on build, so never point it at the app's entire output or at source files.
 
-Branding fields: `name`, `title`, `description`, `accent` (six-digit hex), optional `logo`, `fontUi`, `fontDisplay`, and `fontStylesheet`. System fonts work without external requests. Optional `socialImage` should be a publicly served image URL. App links are `homeUrl`, `appUrl`, `signupUrl`, optional `pricingUrl`, `ctaLabel`, and `ctaDescription`. These must be site-relative paths or HTTP(S) URLs. Set `author` for the default byline. Listings use `pageSize` (1–50, default 10).
+Branding fields: `name`, `title`, `description`, `accent` (six-digit hex), optional `logo`, `fontUi`, `fontDisplay`, and `fontStylesheet`. System fonts work without external requests. Optional `socialImage` should be a publicly served image URL. Optional `homeUrl`, `appUrl`, `signupUrl`, and `pricingUrl` must be site-relative paths or HTTP(S) URLs. `homeUrl` defaults to the blog index; `appUrl` enables workspace links, and `signupUrl` independently enables the article call to action. Optional `ctaLabel` defaults to "Get started"; optional `ctaDescription` adds explanatory text. Supplied labels/descriptions must be nonempty strings. Set `author` for the default byline. Listings use `pageSize` (1–50, default 10).
 
 These are supported configuration-based styling controls, not an arbitrary CSS override API. The schema rejects unknown fields; host app styles do not automatically apply to the blog's independent HTML pages. Avoid editing vendored engine CSS if you want clean upgrades.
 
@@ -166,8 +333,8 @@ The target must be a published article and the old path must be unused. Static o
 
 ## Publishing this as its own repository
 
-Copy **this directory's source** to a clean checkout (exclude `node_modules/`, `.astro/`, and `dist/`). Its `bun.lock` is intended for an independent engine install; do not include the engine in a consuming app's workspace membership (see dependency isolation above). Run the standalone checks above before publishing. `.github/workflows/ci.yml` becomes active only when this directory is the repository root.
+Prefer [creating a repository from the template](#create-your-repository-from-the-template); manual copying is not required. If you copy instead, copy **this directory's source** to a clean checkout (exclude `node_modules/`, `.astro/`, and `dist/`). Its `bun.lock` is intended for an independent engine install; do not include the engine in a consuming app's workspace membership (see dependency isolation above). Run the standalone checks above before publishing. `.github/workflows/ci.yml` becomes active only when this directory is the repository root.
 
-Keep app-specific branding and articles in consuming applications; the example configuration/content here is intentionally generic. Record the engine commit or release used by each app. This version is `0.1.0`. Update vendored copies deliberately from a reviewed upstream release/commit rather than downloading an unpinned branch during deployment. No GitHub credentials or remote are needed to build or deploy a local copy.
+Keep personal/app-specific branding and articles in your own repository; the example configuration/content here is intentionally generic. Record the engine commit used by each site. This version is `0.1.0`. Use the [template upgrade procedure](#future-engine-updates-for-a-template-created-blog) for a standalone root-level engine and the [vendored upgrade procedure](#upgrade-deliberately) for existing webapps; neither downloads an unpinned engine during deployment. No GitHub credentials or remote are needed to build a local copy; uploading/deploying it uses your host's authentication.
 
-Repository creation, visibility, and publishing are owner decisions; this template does not create a remote or deploy automatically.
+Repository creation, visibility, and publishing are owner decisions. This template does not create remotes or hosting projects; deployment begins only after the host is connected or the Pages workflow is enabled as described above.

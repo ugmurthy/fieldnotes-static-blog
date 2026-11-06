@@ -59,11 +59,11 @@ const pageHref = (number: number) => href(number === 1 ? prefix : `${prefix}page
         </details>}
         <div class="prose"><Content /></div>
       </article>
-      <section class="app-cta" aria-labelledby="cta-title">
+      {settings.signupUrl && <section class="app-cta" aria-labelledby="cta-title">
         <p class="eyebrow">From reading to doing</p><h2 id="cta-title">Take a closer look.</h2>
-        <p>{settings.ctaDescription}</p><a class="button" href={settings.signupUrl}>{settings.ctaLabel} <span aria-hidden="true">↗</span></a>
-        <a class="existing-account" href={settings.appUrl}>Already have an account? Open workspace</a>
-      </section>
+        {settings.ctaDescription && <p>{settings.ctaDescription}</p>}<a class="button" href={settings.signupUrl}>{settings.ctaLabel} <span aria-hidden="true">↗</span></a>
+        {settings.appUrl && <a class="existing-account" href={settings.appUrl}>Already have an account? Open workspace</a>}
+      </section>}
       {related.length > 0 && <section class="related" aria-labelledby="related-title"><h2 id="related-title" class="section-title">Keep exploring</h2>{related.map((item) => <PostCard post={item} categories={categories} />)}</section>}
     </>
   ) : (
@@ -71,7 +71,7 @@ const pageHref = (number: number) => href(number === 1 ? prefix : `${prefix}page
       <header class="index-header"><p class="eyebrow">{scope!.id ? 'The guide collection' : 'A little guidance. A fresh perspective.'}</p><h1>{scope!.title}</h1><p class="lead">{description}</p></header>
       {featured && <PostCard post={featured} categories={categories} featured />}
       {listing.some((item) => item.id !== featured?.id) && <section aria-labelledby="articles-title"><div class="section-heading"><h2 id="articles-title" class="section-title">{scope!.id ? 'In this category' : 'Latest articles'}</h2><span>Page {page} of {pages}</span></div>{listing.filter((item) => item.id !== featured?.id).map((item) => <PostCard post={item} categories={categories} />)}</section>}
-      {listing.length === 0 && <p class="empty-state">The first guide is on its way. <a href={settings.appUrl}>Explore the app</a> in the meantime.</p>}
+      {listing.length === 0 && <p class="empty-state">The first guide is on its way.{settings.appUrl && <> <a href={settings.appUrl}>Explore the app</a> in the meantime.</>}</p>}
       {pages > 1 && <nav class="pagination" aria-label="Pagination">{page > 1 && <a rel="prev" href={pageHref(page - 1)}>← Newer articles</a>}<span>Page {page} of {pages}</span>{page < pages && <a rel="next" href={pageHref(page + 1)}>Older articles →</a>}</nav>}
     </>
   )}

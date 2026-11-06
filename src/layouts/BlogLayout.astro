@@ -41,14 +41,14 @@ const structuredData = post ? {
     <a class="skip-link" href="#main">Skip to content</a>
     <header class="site-header">
       <div class="header-inner">
-        <a class="wordmark" href={settings.homeUrl}>
+        <a class="wordmark" href={settings.homeUrl ?? href()}>
           {settings.logo ? <img src={settings.logo} alt="" width="26" height="26" /> : <svg aria-hidden="true" width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 3h12v15H4zM9 8h12v15H9" /></svg>}
           <span>{settings.name}</span>
         </a>
         <nav class="header-nav" aria-label="Main navigation">
           <a class="blog-link" href={href()} aria-current={!post && !current ? 'page' : undefined}>{settings.title}</a>
           {settings.pricingUrl && <a href={settings.pricingUrl}>Pricing</a>}
-          <a class="button small" href={settings.appUrl}>Open workspace <span aria-hidden="true">↗</span></a>
+          {settings.appUrl && <a class="button small" href={settings.appUrl}>Open workspace <span aria-hidden="true">↗</span></a>}
         </nav>
       </div>
     </header>
@@ -74,10 +74,10 @@ const structuredData = post ? {
       </div>
     </div>
     <footer class="site-footer">
-      <a class="wordmark" href={settings.homeUrl}>{settings.name}</a>
+      <a class="wordmark" href={settings.homeUrl ?? href()}>{settings.name}</a>
       <span>{settings.title}</span>
       <a href={href('rss.xml')}>RSS</a>
-      <a href={settings.appUrl}>Open workspace</a>
+      {settings.appUrl && <a href={settings.appUrl}>Open workspace</a>}
     </footer>
   </body>
 </html>
