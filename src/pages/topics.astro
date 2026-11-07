@@ -1,0 +1,12 @@
+---
+import BlogLayout from '../layouts/BlogLayout.astro';
+import { catalog } from '../catalog';
+import { href } from '../settings';
+import { topicPath } from '../topics';
+const { topics } = await catalog();
+---
+<BlogLayout title="Topics" description="Explore articles by topic, across all categories.">
+  <header class="index-header"><p class="eyebrow">Across the categories</p><h1>Browse topics</h1><p class="lead">Follow a topic to find connected articles, wherever they live.</p></header>
+  {topics.length ? <ul class="topic-directory">{topics.map((topic) => <li><a href={href(topicPath(topic.title))}>{topic.title}<span>{topic.count} {topic.count === 1 ? 'article' : 'articles'}</span></a></li>)}</ul>
+    : <p class="empty-state">No topics yet. <a href={href()}>Browse all articles</a>.</p>}
+</BlogLayout>

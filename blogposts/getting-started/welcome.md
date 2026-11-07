@@ -2,6 +2,7 @@
 title: "Welcome to your blog"
 description: "Replace this example with a useful first guide to your app."
 published: "2026-10-30"
+keywords: ["getting started", "writing"]
 featured: true
 ---
 

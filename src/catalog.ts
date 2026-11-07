@@ -3,9 +3,11 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'astro/zod';
 import { contentDir, settings, validateSlug } from './settings';
+import { topicSlug } from './topics';
 
 export type Post = CollectionEntry<'posts'>;
 export interface Category { id: string; title: string; description: string; order: number; parent: string; }
+export interface Topic { id: string; title: string; count: number; }
 const categorySchema = z.object({ title: z.string().min(1).optional(), description: z.string().optional(), order: z.number().optional() }).strict();
 export async function catalog() {
   const posts = (await getCollection('posts', ({ data }) => !data.draft))
@@ -32,7 +34,18 @@ export async function catalog() {
       throw new Error(`Redirect must map an unused path to a published article: ${from} → ${to}`);
     }
   }
-  return { posts, categories: [...categories.values()].sort((a, b) => a.order - b.order || a.title.localeCompare(b.title)) };
+  const topics = new Map<string, Topic>();
+  for (const post of posts) {
+    for (const keyword of post.data.keywords) {
+      const id = topicSlug(keyword);
+      const topic = topics.get(id);
+      if (topic && topic.title !== keyword) throw new Error(`Keywords share a topic URL: "${topic.title}" and "${keyword}". Use one label consistently.`);
+      if (topic) topic.count++;
+      else topics.set(id, { id, title: keyword, count: 1 });
+    }
+  }
+  return { posts, categories: [...categories.values()].sort((a, b) => a.order - b.order || a.title.localeCompare(b.title)),
+    topics: [...topics.values()].sort((a, b) => a.title.localeCompare(b.title)) };
 }
 export const categoryId = (post: Post) => post.id.split('/').slice(0, -1).join('/');
 export const readingTime = (post: Post) => Math.max(1, Math.ceil((post.body ?? '').split(/\s+/).length / 200));

@@ -1,6 +1,7 @@
 ---
 import { type Post, type Category, categoryId, readingTime } from '../catalog';
 import { href } from '../settings';
+import { topicPath } from '../topics';
 interface Props { post: Post; categories: Category[]; featured?: boolean; }
 const { post, categories, featured = false } = Astro.props;
 const category = categories.find((item) => item.id === categoryId(post));
@@ -9,5 +10,6 @@ const category = categories.find((item) => item.id === categoryId(post));
   <p class="eyebrow">{featured ? 'Featured guide' : category?.title ?? 'Guide'} <span aria-hidden="true">·</span> {readingTime(post)} min read</p>
   <h2><a href={href(`${post.id}/`)}>{post.data.title}</a></h2>
   <p class="description">{post.data.description}</p>
+  {post.data.keywords.length > 0 && <ul class="topic-links" aria-label="Article topics">{post.data.keywords.map((keyword) => <li><a href={href(topicPath(keyword))}>{keyword}</a></li>)}</ul>}
   <a class="read-link" href={href(`${post.id}/`)} aria-label={`Read ${post.data.title}`}>Read the guide <span aria-hidden="true">↗</span></a>
 </article>

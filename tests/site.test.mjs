@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
+import { searchPosts } from '../src/search.ts';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const temporary = mkdtempSync(join(tmpdir(), 'static-blog-'));
@@ -31,10 +32,10 @@ function build(overrides = {}, env = {}) {
 const html = (path) => readFileSync(join(output, path), 'utf8');
 
 beforeAll(() => {
-  write('guides/nested/first.md', article('First & foremost', '2026-10-29', '[Second](../second.md#a-real-heading)\n\n![A sample drawing](./sample.svg)', 'featured: true'));
-  write('guides/second.md', article('Second guide', '2026-10-30'));
-  write('tips/third.md', article('Third guide', '2026-10-28'));
-  write('private/unpublished.md', article('Secret draft', '2026-10-31', 'Never publish this text.', 'draft: true'));
+  write('guides/nested/first.md', article('First & foremost', '2026-10-29', 'bodyonlymarker\n\n[Second](../second.md#a-real-heading)\n\n![A sample drawing](./sample.svg)', 'featured: true\nkeywords: ["  Alignment  ", "alignment", "manual anchors", "Café", "日本語"]'));
+  write('guides/second.md', article('Second guide', '2026-10-30', '', 'keywords: ["alignment", "export"]'));
+  write('tips/third.md', article('Third guide', '2026-10-28', '', 'keywords: ["alignment"]'));
+  write('private/unpublished.md', article('Secret draft', '2026-10-31', 'Never publish this text.', 'draft: true\nkeywords: ["hidden topic"]'));
   write('guides/_category.json', JSON.stringify({ title: 'Step by step', order: 1, description: 'Real nested guides.' }));
   write('guides/nested/sample.svg', '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><path d="M0 0L24 24"/></svg>');
   const result = build();
@@ -89,6 +90,50 @@ test('discovery metadata, conversion links, moved articles, and not-found page a
   expect(html('404.html')).toContain('content="noindex"');
 });
 
+test('search publishes metadata only, and topics cross categories with static pagination', () => {
+  const entries = JSON.parse(html('search-index.json'));
+  expect(entries.map((entry) => entry.title)).toEqual(['Second guide', 'First & foremost', 'Third guide']);
+  expect(entries[1]).toEqual({ url: '/learn/guides/nested/first/', title: 'First & foremost',
+    description: 'A useful guide for another app', keywords: ['alignment', 'manual anchors', 'café', '日本語'], category: 'Nested' });
+  expect(html('search-index.json')).not.toContain('bodyonlymarker');
+  expect(searchPosts(entries, 'bodyonlymarker')).toEqual([]);
+  expect(searchPosts(entries, 'Nested')).toEqual([]);
+  expect(searchPosts(entries, '  MANUAL foremost  ').map((entry) => entry.title)).toEqual(['First & foremost']);
+  expect(searchPosts(entries, 'foremost export')).toEqual([]);
+  expect(html('topics/index.html')).toContain('3 articles');
+  expect(html('topics/index.html')).toContain('href="/learn/topic/manual-anchors/"');
+  expect(html('topic/alignment/index.html')).toContain('rel="next" href="/learn/topic/alignment/page/2/"');
+  expect(html('topic/alignment/page/2/index.html')).toContain('<h2><a href="/learn/tips/third/"');
+  expect(html('topic/alignment/page/2/index.html')).toContain('rel="prev" href="/learn/topic/alignment/"');
+  expect(html('sitemap.xml')).toContain('https://another.example/learn/topic/alignment/page/2/');
+  expect(html('topic/cafe/index.html')).toContain('First &amp; foremost');
+  expect(html('topic/日本語/index.html')).toContain('First &amp; foremost');
+  for (const path of ['search-index.json', 'search/index.html', 'topics/index.html', 'sitemap.xml']) {
+    expect(html(path)).not.toContain('hidden topic');
+    expect(html(path)).not.toContain('Secret draft');
+  }
+  expect(existsSync(join(output, 'topic/hidden-topic/index.html'))).toBe(false);
+  for (const path of ['topics/index.html', 'topic/alignment/index.html']) {
+    expect(html(path)).not.toMatch(/<script(?![^>]*type="application\/ld\+json")/);
+  }
+  expect(html('search/index.html')).toContain('data-index-url="/learn/search-index.json"');
+  expect(html('search/index.html')).toContain('Text search needs JavaScript.');
+  expect(html('search/index.html')).toContain('href="/learn/category/guides/"');
+});
+
+test('search ranks strongest fields first, requires every word, and keeps ties stable', () => {
+  const entries = [
+    { url: '/description/', title: 'Other', keywords: [], description: 'Anchor anchor anchor' },
+    { url: '/keyword/', title: 'Other', keywords: ['anchor'], description: 'Anchor' },
+    { url: '/title/', title: 'Anchor tutorial', keywords: [], description: 'Other' },
+    { url: '/tie/', title: 'Anchor notes', keywords: [], description: 'Other' }
+  ].map((entry) => ({ ...entry, category: 'Guide' }));
+  expect(searchPosts(entries, 'ANCHOR anchor').map((entry) => entry.url)).toEqual(['/title/', '/tie/', '/keyword/', '/description/']);
+  expect(searchPosts(entries, 'anchor other').map((entry) => entry.url)).toEqual(['/keyword/', '/description/', '/title/', '/tie/']);
+  expect(searchPosts(entries, 'anchor missing')).toEqual([]);
+  expect(searchPosts(entries, '   ')).toEqual([]);
+});
+
 test('standalone root and project sites honor hosting URLs without app UI', () => {
   const standalone = { appUrl: undefined, signupUrl: undefined, pricingUrl: undefined,
     ctaLabel: undefined, ctaDescription: undefined, homeUrl: undefined };
@@ -104,7 +149,10 @@ test('standalone root and project sites honor hosting URLs without app UI', () =
     expect(html('rss.xml')).toContain(`https://writer.github.io${prefix}/guides/nested/first/`);
     expect(html('sitemap.xml')).toContain(`https://writer.github.io${prefix}/category/guides/nested/`);
     expect(html('old-first/index.html')).toContain(`${prefix}/guides/nested/first/`);
-    for (const path of ['index.html', 'category/guides/index.html', 'guides/nested/first/index.html', '404.html']) {
+    expect(JSON.parse(html('search-index.json'))[0].url).toBe(`${prefix}/guides/second/`);
+    expect(html('search/index.html')).toContain(`data-index-url="${prefix}/search-index.json"`);
+    expect(html('topics/index.html')).toContain(`href="${prefix}/topic/manual-anchors/"`);
+    for (const path of ['index.html', 'category/guides/index.html', 'guides/nested/first/index.html', 'search/index.html', 'topics/index.html', '404.html']) {
       const page = html(path);
       expect(page).not.toContain('Open workspace');
       expect(page).not.toContain('class="app-cta"');
@@ -120,6 +168,8 @@ test('standalone root and project sites honor hosting URLs without app UI', () =
   expect(html('index.html')).toContain('The first guide is on its way.');
   expect(html('index.html')).not.toContain('Explore the app');
   expect(html('index.html')).not.toContain('in the meantime.');
+  expect(JSON.parse(html('search-index.json'))).toEqual([]);
+  expect(html('topics/index.html')).toContain('No topics yet.');
 }, 60000);
 
 test('workspace links and signup CTA can be enabled independently', () => {
@@ -151,14 +201,30 @@ test('build rejects broken Markdown links and links to unpublished articles', ()
   rmSync(join(content, 'broken.md'));
 }, 60000);
 
+test('build rejects invalid keywords and ambiguous topic URLs', () => {
+  for (const [keywords, message] of [
+    ['["  "]', 'Keywords must contain letters or numbers'],
+    ['["manual-anchors"]', 'Keywords share a topic URL']
+  ]) {
+    write('bad-keywords.md', article('Bad keywords', '2026-10-30', '', `keywords: ${keywords}`));
+    const result = build();
+    expect(result.status).not.toBe(0);
+    expect(result.stdout + result.stderr).toContain(message);
+    rmSync(join(content, 'bad-keywords.md'));
+  }
+}, 60000);
+
 test('build rejects invalid dates and reserved category paths', () => {
   write('bad-date.md', article('Invalid date', '2026-02-30'));
   let result = build();
   expect(result.status).not.toBe(0);
   expect(result.stdout + result.stderr).toContain('YYYY-MM-DD');
   rmSync(join(content, 'bad-date.md'));
-  write('page/collision.md', article('Reserved', '2026-10-30'));
-  result = build();
-  expect(result.status).not.toBe(0);
-  expect(result.stdout + result.stderr).toContain('reserved routes');
+  for (const path of ['page/collision.md', 'topic/collision.md', 'search.md', 'topics.md']) {
+    write(path, article('Reserved', '2026-10-30'));
+    result = build();
+    expect(result.status).not.toBe(0);
+    expect(result.stdout + result.stderr).toContain('reserved routes');
+    rmSync(join(content, path));
+  }
 }, 60000);

@@ -1,6 +1,6 @@
 # Fieldnotes: a reusable static blog
 
-An independent Astro/TypeScript blog template for standalone sites or integration into webapps. Markdown and nested folders become public HTML pages. No login, database, browser Markdown parser, or app JavaScript is required. Use this directory as the root of its own GitHub repository; it contains its own package manifest, lockfile, example content, tests, and hosting configuration.
+An independent Astro/TypeScript blog template for standalone sites or integration into webapps. Markdown and nested folders become public HTML pages. No login, database, browser Markdown parser, or host-app JavaScript is required. Reading and topic/category browsing work without JavaScript; metadata search uses a small script on the Search page only. Use this directory as the root of its own GitHub repository; it contains its own package manifest, lockfile, example content, tests, and hosting configuration.
 
 Upstream: [ugmurthy/fieldnotes-static-blog](https://github.com/ugmurthy/fieldnotes-static-blog) (public).
 
@@ -283,7 +283,7 @@ Engine updates do **not** update the installed skill/script. Review/protect loca
 
 ## Writing articles
 
-Create a lowercase kebab-case `.md` file under `blogposts/`. Every parent folder is a category. For example, `blogposts/tutorials/alignment/manual-anchors.md` becomes `/blog/tutorials/alignment/manual-anchors/` with `base: "/blog"`. Category listings live at `/blog/category/tutorials/` and `/blog/category/tutorials/alignment/`. `category`, `page`, `_astro`, `_media`, and `404` are reserved top-level article paths.
+Create a lowercase kebab-case `.md` file under `blogposts/`. Every parent folder is a category. For example, `blogposts/tutorials/alignment/manual-anchors.md` becomes `/blog/tutorials/alignment/manual-anchors/` with `base: "/blog"`. Category listings live at `/blog/category/tutorials/` and `/blog/category/tutorials/alignment/`. `category`, `page`, `topic`, `topics`, `search`, `_astro`, `_media`, and `404` are reserved top-level article paths.
 
 ```markdown
 ---
@@ -292,6 +292,7 @@ description: "What the reader will learn."
 published: "2026-10-30"
 updated: "2026-11-02"
 author: "Your team"
+keywords: ["alignment", "manual anchors"]
 featured: true
 draft: false
 ---
@@ -320,6 +321,20 @@ An optional `_category.json` in any category folder controls labels, description
 ```
 
 Without it, folder names become display labels. Empty categories are not published. Newest articles come first, with the path as a stable tie-breaker. On the first homepage page, the first `featured: true` article within that page receives the feature card. Pagination keeps page payloads bounded; category navigation lists categories, not every article.
+
+## Search and topics
+
+The navigation includes **Search** and **Topics**. Search matches article **titles, descriptions, and keywords only**, not body text or category labels. Matching is case-insensitive and uses substrings; every whitespace-separated query word must match somewhere in those fields. Results rank each word's strongest match (title above keyword above description), with newest articles first on ties. There is no fuzzy matching or special query syntax. Put important concepts and alternate terminology in the description or keywords when they should be discoverable.
+
+`keywords` is an optional array of public topic labels. Missing keywords default to an empty array; existing articles need no migration. Labels are trimmed, lowercased, whitespace-normalized, and deduplicated per article. They must contain letters or numbers. Topic URLs use lowercase slugs with punctuation/spaces converted to hyphens and combining accents removed: `manual anchors` becomes `topic/manual-anchors/`. Unicode letters are supported. Different labels that produce the same slug (such as `manual anchors` and `manual-anchors`) fail the build; choose one label consistently.
+
+With `base: "/blog"`, `/blog/topics/` lists topics alphabetically with published-article counts. `/blog/topic/alignment/` lists matching articles across categories, newest first, with the configured `pageSize`. Topic links appear on article pages and cards. Topic pages and their pagination are included in the sitemap; drafts and draft-only topics are excluded. Changing a keyword can change its topic URL, but never the article URL.
+
+`/blog/search/` loads a generated `search-index.json` only on the first nonempty search, then reuses it for that page visit. Each entry contains only the article URL, title, description, keywords, and category label for display. There is no body extraction, browser Markdown parser, extra dependency, search service, or backend. Queries stay in the browser and the page's `?q=` URL (so searches can be bookmarked); they are not sent to a search API. As with any URL, a shared/bookmarked query can appear in hosting access logs when the page is requested. The entire metadata index downloads when searching, so measure its size as the collection grows.
+
+Without JavaScript, the Search page explains the limitation and provides static topic/category links instead of an unusable form. If the index cannot load, search offers a retry by submitting again while those links remain available. Articles, listings, and topics load no search JavaScript or index. Empty blogs and articles without keywords still support search and category browsing.
+
+The normal `bun run build` emits everything into the configured `outDir`, with asset/result URLs honoring `base`. Copy/mount the whole output as usual, including the JSON and `_astro/` assets; no extra host-app build step or runtime integration is needed. Check search and a topic link on the actually served host as part of integration validation.
 
 ## Moving an article
 

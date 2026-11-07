@@ -1,0 +1,105 @@
+---
+import BlogLayout from '../layouts/BlogLayout.astro';
+import { catalog } from '../catalog';
+import { href } from '../settings';
+import { topicPath } from '../topics';
+const { topics, categories } = await catalog();
+---
+<BlogLayout title="Search" description="Search article titles, descriptions, and keywords." noindex>
+  <header class="index-header"><p class="eyebrow">Find your next guide</p><h1>Search the guides</h1><p class="lead">Search titles, descriptions, and keywords—not article body text.</p></header>
+  <div id="article-search" data-index-url={href('search-index.json')} data-base={href()}>
+    <form class="search-form" role="search" action={href('search/')} method="get" hidden>
+      <label for="search-query">Search articles</label>
+      <div class="search-controls">
+        <div class="search-field">
+          <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 4.5 4.5" /></svg>
+          <input id="search-query" name="q" type="search" placeholder="A topic or a few words…" aria-describedby="search-help" />
+        </div>
+        <button class="button" type="submit">Search</button>
+      </div>
+      <p id="search-help">All words must match. Title and keyword matches appear first.</p>
+    </form>
+    <p id="search-unavailable">Text search needs JavaScript. You can still browse topics and categories below.</p>
+    <p id="search-status" role="status" aria-live="polite"></p>
+    <section id="search-results" aria-label="Search results"></section>
+  </div>
+  <section class="search-browse" aria-labelledby="browse-title">
+    <h2 id="browse-title" class="section-title">Or browse by topic</h2>
+    {topics.length ? <ul class="topic-links">{topics.map((topic) => <li><a href={href(topicPath(topic.title))}>{topic.title} <span>({topic.count})</span></a></li>)}</ul> : <p>No topics yet.</p>}
+    <h2 class="section-title">Browse categories</h2>
+    <ul class="topic-links">{categories.map((category) => <li><a href={href(`category/${category.id}/`)}>{category.title}</a></li>)}</ul>
+    <a class="read-link" href={href()}>Browse all articles <span aria-hidden="true">↗</span></a>
+  </section>
+</BlogLayout>
+
+<script>
+  import { searchPosts, type SearchEntry } from '../search';
+  import { topicPath } from '../topics';
+
+  const root = document.querySelector<HTMLElement>('#article-search')!;
+  const form = root.querySelector<HTMLFormElement>('form')!;
+  const input = root.querySelector<HTMLInputElement>('input')!;
+  const status = root.querySelector<HTMLElement>('#search-status')!;
+  const results = root.querySelector<HTMLElement>('#search-results')!;
+  let index: Promise<SearchEntry[]> | undefined;
+  let request = 0;
+  form.hidden = false;
+  root.querySelector<HTMLElement>('#search-unavailable')!.hidden = true;
+
+  function element<K extends keyof HTMLElementTagNameMap>(tag: K, text: string, className = '') {
+    const node = document.createElement(tag);
+    node.textContent = text;
+    node.className = className;
+    return node;
+  }
+
+  async function search() {
+    const current = ++request;
+    const query = input.value.trim();
+    const url = new URL(location.href);
+    if (query) url.searchParams.set('q', query);
+    else url.searchParams.delete('q');
+    history.replaceState(null, '', url);
+    results.replaceChildren();
+    if (!query) { status.textContent = 'Enter words to search, or browse below.'; return; }
+    status.textContent = 'Loading articles…';
+    try {
+      index ??= fetch(root.dataset.indexUrl!).then((response) => {
+        if (!response.ok) throw new Error('Search index unavailable');
+        return response.json() as Promise<SearchEntry[]>;
+      }).catch((error) => { index = undefined; throw error; });
+      const matches = searchPosts(await index, query);
+      if (current !== request) return;
+      status.textContent = matches.length ? `${matches.length} ${matches.length === 1 ? 'article' : 'articles'} found.`
+        : 'No matching articles. Try fewer words, or browse below.';
+      const fragment = document.createDocumentFragment();
+      for (const post of matches) {
+        const article = element('article', '', 'post-card');
+        const heading = element('h2', '');
+        const link = element('a', post.title);
+        link.href = post.url;
+        heading.append(link);
+        article.append(element('p', post.category, 'eyebrow'), heading, element('p', post.description, 'description'));
+        if (post.keywords.length) {
+          const topics = element('ul', '', 'topic-links');
+          topics.setAttribute('aria-label', 'Article topics');
+          for (const keyword of post.keywords) {
+            const item = element('li', '');
+            const topic = element('a', keyword);
+            topic.href = root.dataset.base + topicPath(keyword);
+            item.append(topic);
+            topics.append(item);
+          }
+          article.append(topics);
+        }
+        fragment.append(article);
+      }
+      results.append(fragment);
+    } catch {
+      if (current === request) status.textContent = 'Search could not load. Try searching again, or browse topics and categories below.';
+    }
+  }
+  form.addEventListener('submit', (event) => { event.preventDefault(); void search(); });
+  input.value = new URLSearchParams(location.search).get('q') ?? '';
+  if (input.value.trim()) void search();
+</script>

@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+- Dependency-free metadata search (titles, descriptions, and optional frontmatter keywords; no article bodies in the JSON index). Only the Search page loads search JavaScript, and the index is fetched on demand.
+- Static topic directory and paginated cross-category topic pages, article topic links, and topic sitemap entries. Reading and topic/category browsing still work without JavaScript. Keywords are normalized/deduplicated and ambiguous topic slugs fail the build. New reserved top-level article paths: `search`, `topics`, and `topic`; move existing content using those paths before upgrading.
 - Standalone deployment configuration for GitHub Pages (opt-in workflow), Netlify, and Vercel, without server adapters or SPA fallbacks.
 - Template-based setup for a `/blog` project site, source/content ownership, and pinned three-way engine upgrades that preserve personal content and configuration.
 - Optional workspace links and article signup calls to action. Existing app configurations retain their behavior; omit `appUrl` and `signupUrl` for a standalone blog. Omitted `homeUrl` links to the blog index, `ctaLabel` defaults to "Get started", and `ctaDescription` is optional.

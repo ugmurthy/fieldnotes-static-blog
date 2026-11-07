@@ -35,7 +35,7 @@ export const href = (path = '') => `${base}/${path.replace(/^\//, '')}`;
 export const absolute = (path: string) => new URL(path, settings.site).href;
 export function validateSlug(slug: string) {
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)*$/.test(slug)
-    || /^(category|page|_astro|_media)(\/|$)/.test(slug) || slug === '404') {
+    || /^(category|page|topic|topics|search|_astro|_media)(\/|$)/.test(slug) || slug === '404') {
     throw new Error(`Use lowercase kebab-case article/category paths, excluding reserved routes: ${slug}`);
   }
   return slug;

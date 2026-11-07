@@ -7,6 +7,8 @@ interface Props { title: string; description: string; current?: string; post?: P
 const { title, description, current = '', post, noindex = false } = Astro.props;
 const { categories } = await catalog();
 const canonical = absolute(Astro.url.pathname);
+const onIndex = Astro.url.pathname === href();
+const onTopics = Astro.url.pathname === href('topics/') || Astro.url.pathname.startsWith(href('topic/'));
 const socialImage = settings.socialImage ? absolute(settings.socialImage) : undefined;
 const structuredData = post ? {
   '@context': 'https://schema.org', '@type': 'BlogPosting', headline: post.data.title,
@@ -46,7 +48,9 @@ const structuredData = post ? {
           <span>{settings.name}</span>
         </a>
         <nav class="header-nav" aria-label="Main navigation">
-          <a class="blog-link" href={href()} aria-current={!post && !current ? 'page' : undefined}>{settings.title}</a>
+          <a class="blog-link" href={href()} aria-current={onIndex ? 'page' : undefined}>{settings.title}</a>
+          <a href={href('topics/')} aria-current={onTopics ? 'page' : undefined}>Topics</a>
+          <a href={href('search/')} aria-current={Astro.url.pathname === href('search/') ? 'page' : undefined}>Search</a>
           {settings.pricingUrl && <a href={settings.pricingUrl}>Pricing</a>}
           {settings.appUrl && <a class="button small" href={settings.appUrl}>Open workspace <span aria-hidden="true">↗</span></a>}
         </nav>
@@ -56,7 +60,7 @@ const structuredData = post ? {
       <aside class="category-rail">
         <nav aria-label="Blog categories">
           <p class="nav-label">Explore the guides</p>
-          <a class="all-link" href={href()} aria-current={!current && !post ? 'page' : undefined}>All articles</a>
+          <a class="all-link" href={href()} aria-current={onIndex ? 'page' : undefined}>All articles</a>
           <CategoryTree categories={categories} current={current} />
           <a class="rss-link" href={href('rss.xml')}>Follow via RSS <span aria-hidden="true">↗</span></a>
         </nav>

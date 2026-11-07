@@ -2,6 +2,7 @@
 title: "Welcome: images, code, and video"
 description: "A hands-on welcome article showing Markdown images, highlighted code, a native video player, and an embedded YouTube video."
 published: "2026-11-06"
+keywords: ["writing", "images", "code", "video"]
 featured: true
 ---
 
